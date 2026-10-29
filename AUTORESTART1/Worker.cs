@@ -1,4 +1,4 @@
-
+﻿
 
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Hosting;
@@ -18,55 +18,119 @@ public class BackupWorker : BackgroundService
         _config = config;
     }
 
+  
+   
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
-        _logger.LogInformation(" BACKUP WORKER STARTED ");
+        _logger.LogInformation("BACKUP WORKER STARTED");
 
         string sourceFile = _config["BackupSettings:SourceFile"]!;
         string backupFolder = _config["BackupSettings:BackupFolder"]!;
-        string runTime = _config["BackupSettings:RunTime"]!;
 
         _logger.LogInformation("Source File: {SourceFile}", sourceFile);
         _logger.LogInformation("Backup Folder: {BackupFolder}", backupFolder);
-        _logger.LogInformation("Run Time: {RunTime}", runTime);
 
-        // FIRST RUN IMMEDIATELY
-        try
-        {
-            _logger.LogInformation("Running first backup immediately...");
-            _logger.LogInformation("Calling RunBackup()");
+        //while (!stoppingToken.IsCancellationRequested)
+        //{
+        //    try
+        //    {
+        //        DateTime now = DateTime.Now;
 
-            RunBackup(sourceFile, backupFolder);
+        //        // Backup window: 8:00 AM to 9:00 PM
+        //        TimeSpan startTime = new TimeSpan(8, 0, 0);
+        //        TimeSpan endTime = new TimeSpan(21, 0, 0);
 
-            _logger.LogInformation("First backup completed.");
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "First backup failed.");
-        }
+        //        DateTime nextRun;
 
-        // DAILY LOOP
+        //        // If current time is before 8 AM
+        //        if (now.TimeOfDay < startTime)
+        //        {
+        //            nextRun = now.Date.Add(startTime);
+        //        }
+        //        // If current time is between 8 AM and 9 PM
+        //        else if (now.TimeOfDay <= endTime)
+        //        {
+        //            // Run at the next full hour
+        //            nextRun = now.Date
+        //                .AddHours(now.Hour + 1);
+
+        //            // If it's exactly 8:00, next run becomes 9:00.
+        //            // If service starts at 8:30, next run becomes 9:00.
+        //            // If service starts at 20:30, next run becomes 21:00.
+        //        }
+        //        // After 9 PM → wait until 8 AM tomorrow
+        //        else
+        //        {
+        //            nextRun = now.Date.AddDays(1).Add(startTime);
+        //        }
+
+        //        TimeSpan waitTime = nextRun - now;
+
+        //        _logger.LogInformation(
+        //            "Current time: {Now}",
+        //            now);
+
+        //        _logger.LogInformation(
+        //            "Next backup scheduled at: {NextRun}",
+        //            nextRun);
+
+        //        _logger.LogInformation(
+        //            "Waiting for: {WaitTime}",
+        //            waitTime);
+
+        //        await Task.Delay(waitTime, stoppingToken);
+
+        //        if (stoppingToken.IsCancellationRequested)
+        //            break;
+
+        //        _logger.LogInformation("Starting scheduled backup...");
+
+        //        RunBackup(sourceFile, backupFolder);
+
+        //        _logger.LogInformation("Scheduled backup completed.");
+        //    }
+        //    catch (OperationCanceledException)
+        //    {
+        //        break;
+        //    }
+        //    catch (Exception ex)
+        //    {
+        //        _logger.LogError(ex, "Scheduled backup failed.");
+
+        //        await Task.Delay(
+        //            TimeSpan.FromMinutes(5),
+        //            stoppingToken);
+        //    }
+        //}
+
+   
         while (!stoppingToken.IsCancellationRequested)
         {
             try
             {
-                _logger.LogInformation("Calculating next run time...");
-
-                TimeSpan target = TimeSpan.Parse(runTime);
                 DateTime now = DateTime.Now;
 
-                DateTime nextRun = now.Date.Add(target);
+                // FOR TESTING: Run backup every 5 minutes
+                DateTime nextRun = now.AddMinutes(5);
 
-                if (nextRun <= now)
-                    nextRun = nextRun.AddDays(1);
+                TimeSpan waitTime = nextRun - now;
 
-                TimeSpan wait = nextRun - now;
+                _logger.LogInformation(
+                    "Current time: {Now}",
+                    now);
 
-                _logger.LogInformation("Current time: {Now}", now);
-                _logger.LogInformation("Next backup scheduled at: {NextRun}", nextRun);
-                _logger.LogInformation("Waiting for: {Wait}", wait);
+                _logger.LogInformation(
+                    "TEST MODE - Next backup scheduled at: {NextRun}",
+                    nextRun);
 
-                await Task.Delay(wait, stoppingToken);
+                _logger.LogInformation(
+                    "Waiting for: {WaitTime}",
+                    waitTime);
+
+                await Task.Delay(waitTime, stoppingToken);
+
+                if (stoppingToken.IsCancellationRequested)
+                    break;
 
                 _logger.LogInformation("Starting scheduled backup...");
 
@@ -74,14 +138,25 @@ public class BackupWorker : BackgroundService
 
                 _logger.LogInformation("Scheduled backup completed.");
             }
+            catch (OperationCanceledException)
+            {
+                break;
+            }
             catch (Exception ex)
             {
                 _logger.LogError(ex, "Scheduled backup failed.");
 
-                await Task.Delay(TimeSpan.FromMinutes(5), stoppingToken);
+                await Task.Delay(
+                    TimeSpan.FromMinutes(1),
+                    stoppingToken);
             }
         }
+
+
+        _logger.LogInformation("BACKUP WORKER STOPPED");
     }
+
+
 
     private void RunBackup(string sourceFile, string backupFolder)
     {
@@ -255,6 +330,7 @@ catch (Exception ex)
                 _logger.LogWarning("STARTING FILE COPY NOW...");
 
                 File.Copy(shadowFile, backupFile, true);
+                File.SetLastWriteTime(backupFile, DateTime.Now);
 
                 _logger.LogWarning("FILE COPY SUCCESS");
             }
